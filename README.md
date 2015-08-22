@@ -1,14 +1,14 @@
 # aws-ecs-elasticsearch
-A Dockerized [ElasticSearch](https://github.com/dockerfile/elasticsearch) cluster orchestrated via Amazon Web Services [CloudFormation](http://www.cloudsarelies.com.s3-website-eu-west-1.amazonaws.com/).
+A [Dockerized Elasticsearch](https://github.com/dockerfile/elasticsearch) cluster, orchestrated via Amazon Web Services [CloudFormation](http://www.cloudsarelies.com.s3-website-eu-west-1.amazonaws.com/).
 
-## Make
-To make the Docker container, run:
+## Bake
+To bake an Elasticsearch container run
 ```
   make
 ```
 
 ## Run
-To run the CloudFormation template simply execute the bash wrapper:
+Simply execute the bash wrapper
 ```
   ./run create|update default example.com
 ```
