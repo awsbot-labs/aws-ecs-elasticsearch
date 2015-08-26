@@ -539,7 +539,7 @@
                 "ContainerDefinitions": [
                     {
                         "Name": "elasticsearch",
-                        "Image": "elasticsearch:1.7.1",
+                        "Image": "dcrbsltd/elasticsearch:latest",
                         "Essential": "true",
                         "Cpu": "2048",
                         "Memory": "2048",

@@ -6,7 +6,10 @@ To bake an Elasticsearch container run
 ```
   make
 ```
-
+Push to [dockerhub](https://hub.docker.com/)
+```
+  docker push mydockerhub/elasticsearch:version
+```
 ## Run
 Simply execute the bash wrapper
 ```
