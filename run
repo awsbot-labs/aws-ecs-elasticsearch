@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ $# -eq 0 ]; then
-  echo "Usage: $0 create|update <SSH_KEYNAME> <DNSDOMAIN>"
-  echo "e.g. $0 create MyAWSKey example.com"
+  echo "Usage: $0 create|update <SSH_KEYNAME> <DNSDOMAIN> <VPCID>"
+  echo "e.g. $0 create MyAWSKey example.com vpc-3ab76351"
   exit 1
 else
   # Sets $IPADDRESS as your external IP (for AWS Security Groups)
@@ -23,5 +23,6 @@ else
     --capabilities CAPABILITY_IAM \
     --parameters ParameterKey=SSHLocation,ParameterValue="$IPADDRESS/32" \
 ParameterKey=KeyName,ParameterValue=$2 \
-ParameterKey=DNSDomain,ParameterValue=$3
+ParameterKey=DNSDomain,ParameterValue=$3 \
+ParameterKey=VpcId,ParameterValue=$4
 fi

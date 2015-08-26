@@ -1,6 +1,8 @@
 elasticsearch:
-  image: elasticsearch
+  image: dcrbsltd/elasticsearch:1.7.1
   ports:
     - "9200:9200"
     - "9300:9300"
+  env_file:
+    - ./environment.sh
 
