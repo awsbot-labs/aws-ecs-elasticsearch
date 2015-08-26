@@ -1,0 +1,8 @@
+[template]
+src = "elasticsearch.yml.tmpl"
+dest = "/etc/elasticsearch/elasticsearch.yml"
+mode = "0644"
+keys = [
+  "/elasticsearch",
+  "/aws"
+]
