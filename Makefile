@@ -1,7 +1,26 @@
-.PHONY: build
-newtag ?= 1.7.1
-image = dcrbsltd/elasticsearch
+NAME = dcrbsltd/elasticsearch
+VERSION = 0.0.1
+.PHONY: all build clean test tag_latest release ssh
+
+all: build
 
 build:
-	docker build -t "${image}:1.7.1" .
-	docker tag -f "${image}:1.7.1" "${image}:${newtag}"
+	docker build -f Dockerfile -t $(NAME):$(VERSION) .
+
+clean:
+	@eval `docker-machine env default` ||:
+	@docker kill `docker ps -a -q` ||:
+	@docker rm -f `docker ps -a -q` ||:
+	@docker rmi -f `docker images -q` ||:
+
+test:
+	env NAME=$(NAME) VERSION=$(VERSION) ./test/runner.sh
+
+tag_latest:
+	docker tag -f $(NAME):$(VERSION) $(NAME):latest
+
+release: test tag_latest
+	@if ! docker images $(NAME) | awk '{ print $$2 }' | grep -q -F $(VERSION)); then echo "$(NAME) version $(VERSION) is not yet built. Please run 'make build'"; false; fi
+	@if ! head -n 1 Changelog.md | grep -q 'release date'; then echo 'Please note the release date in Changelog.md.' && false; fi
+	docker push $(NAME)
+	@echo "*** Don't forget to create a tag. git tag rel-$(VERSION) && git push origin rel-$(VERSION)"
