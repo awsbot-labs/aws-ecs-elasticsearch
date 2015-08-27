@@ -10,6 +10,10 @@
             "MaxValue": "5",
             "ConstraintDescription": "Must be between 1 and 5"
         },
+        "DNSDomain": {
+            "Description": "DNS Name for the Application",
+            "Type": "String"
+        },
         "KeyName": {
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
             "Default": "elasticsearch",
@@ -18,15 +22,6 @@
             "MaxLength": "64",
             "AllowedPattern": "[-_ a-zA-Z0-9]*",
             "ConstraintDescription": "can contain only alphanumeric characters, spaces, dashes and underscores."
-        },
-        "ContainerPort": {
-            "Description": "The application port",
-            "Default": "9200",
-            "Type": "String"
-        },
-        "DNSDomain": {
-            "Description": "DNS Name for the Application",
-            "Type": "String"
         },
         "InstanceType": {
             "Description": "ElasticsearchServer EC2 instance type",
@@ -56,6 +51,26 @@
                 "c3.8xlarge"
             ],
             "ConstraintDescription": "must be a valid EC2 instance type."
+        },
+        "ContainerPort": {
+            "Description": "The application port",
+            "Default": "9200",
+            "Type": "String"
+        },
+        "NotificationEmail": {
+            "Description": "Email to send notifications to",
+            "Type": "String",
+            "Default": "dcrbsltd@gmail.com"
+        },
+        "Shards": {
+            "Description": "The number of Elasticsearch shards",
+            "Default": "5",
+            "Type": "String"
+        },
+        "Replicas": {
+            "Description": "The number of Elasticsearch replicas",
+            "Default": "1",
+            "Type": "String"
         },
         "SSHLocation": {
             "Description": " The IP address range that can be used to SSH to the EC2 instances",
@@ -109,7 +124,7 @@
                 "ecs": "ami-db0306eb"
             },
             "eu-west-1": {
-                "ecs": "ami-7948320e"
+                "ecs": "ami-2aaef35d"
             },
             "ap-northeast-1": {
                 "ecs": "ami-fa12b7fa"
@@ -152,6 +167,19 @@
         }
     },
     "Resources": {
+        "NotificationTopic": {
+            "Type": "AWS::SNS::Topic",
+            "Properties": {
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Ref": "NotificationEmail"
+                        },
+                        "Protocol": "email"
+                    }
+                ]
+            }
+        },
         "ElasticsearchUser": {
             "Type": "AWS::IAM::User",
             "Properties": {
@@ -394,6 +422,17 @@
                         "Ref": "ElasticLoadBalancer"
                     }
                 ],
+                "NotificationConfiguration": {
+                    "TopicARN": {
+                        "Ref": "NotificationTopic"
+                    },
+                    "NotificationTypes": [
+                        "autoscaling:EC2_INSTANCE_LAUNCH",
+                        "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+                        "autoscaling:EC2_INSTANCE_TERMINATE",
+                        "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
+                    ]
+                },
                 "MinSize": "1",
                 "MaxSize": "3",
                 "DesiredCapacity": {
@@ -434,7 +473,8 @@
                     "configSets": {
                         "full_install": [
                             "install_cfn",
-                            "configure_ecs"
+                            "configure_ecs",
+                            "configure_es"
                         ]
                     },
                     "install_cfn": {
@@ -445,6 +485,7 @@
                                         "",
                                         [
                                             "[main]\n",
+                                            "interval=1\n",
                                             "stack=",
                                             {
                                                 "Ref": "AWS::StackId"
@@ -470,14 +511,14 @@
                                             "[cfn-auto-reloader-hook]\n",
                                             "triggers=post.update\n",
                                             "path=Resources.LaunchConfig.Metadata.AWS::CloudFormation::Init\n",
-                                            "action=/opt/aws/bin/cfn-init -v ",
-                                            "         --stack ",
+                                            "action=/opt/aws/bin/cfn-init -v",
+                                            " --stack ",
                                             {
                                                 "Ref": "AWS::StackName"
                                             },
-                                            "         --resource LaunchConfig ",
-                                            "         --configsets configure_ecs ",
-                                            "         --region ",
+                                            " --resource LaunchConfig",
+                                            " --configsets configure_ecs",
+                                            " --region ",
                                             {
                                                 "Ref": "AWS::Region"
                                             },
@@ -519,6 +560,52 @@
                                 "mode": "000644",
                                 "owner": "root",
                                 "group": "root"
+                            }
+                        },
+                        "configure_es": {
+                            "files": {
+                                "/etc/elasticsearch/elasticsearch/yml": {
+                                    "content": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "cluster.name: ",
+                                                {
+                                                    "Ref": "ECSCluster"
+                                                },
+                                                "\n",
+                                                "index.number_of_shards: ",
+                                                {
+                                                    "Ref": "Shards"
+                                                },
+                                                "\n",
+                                                "index.number_of_replicas: ",
+                                                {
+                                                    "Ref": "Replicas"
+                                                },
+                                                "\n",
+                                                "cloud:\n",
+                                                "aws:\n",
+                                                "region: ",
+                                                {
+                                                    "Fn::FindInMap": [
+                                                        "AWSRegion2ESRegion",
+                                                        {
+                                                            "Ref": "AWS::Region"
+                                                        },
+                                                        "region"
+                                                    ]
+                                                },
+                                                "\n",
+                                                "discovery:\n",
+                                                "type: ec2\n"
+                                            ]
+                                        ]
+                                    },
+                                    "mode": "000644",
+                                    "owner": "root",
+                                    "group": "root"
+                                }
                             }
                         }
                     }
@@ -643,7 +730,7 @@
                 "ContainerDefinitions": [
                     {
                         "Name": "elasticsearch",
-                        "Image": "dcrbsltd/elasticsearch:1.7.1",
+                        "Image": "elasticsearch:1.7.1",
                         "Essential": "true",
                         "Cpu": "512",
                         "Memory": "1024",
@@ -683,20 +770,6 @@
                                         "AccessKey",
                                         "SecretAccessKey"
                                     ]
-                                }
-                            },
-                            {
-                                "Name": "ELASTICSEARCH_SHARDS",
-                                "Value": "5"
-                            },
-                            {
-                                "Name": "ELASTICSEARCH_REPLICAS",
-                                "Value": "1"
-                            },
-                            {
-                                "Name": "ELASTICSEARCH_CLUSTER_NAME",
-                                "Value": {
-                                    "Ref": "ECSCluster"
                                 }
                             }
                         ],

@@ -19,8 +19,8 @@ RUN ln -s /docker-entrypoint.sh /etc/my_init.d/98-docker-entrypoint
 ENTRYPOINT ["/sbin/my_init"]
 
 # Envrionment variables for detokenization during bootstrap
-ENV ELASTICSEARCH_SHARDS=
-ENV ELASTICSEARCH_REPLICAS=
+ENV ELASTICSEARCH_SHARDS=3
+ENV ELASTICSEARCH_REPLICAS=3
 ENV ELASTICSEARCH_CLUSTER_NAME=
 ENV AWS_REGION=
 ENV AWS_ACCESS_KEY_ID=
