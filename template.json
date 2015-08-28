@@ -4,7 +4,7 @@
     "Parameters": {
         "DesiredCapacity": {
             "Description": "Desirered number of instances in the Elasticsearch auto-scaling group",
-            "Default": "1",
+            "Default": "2",
             "Type": "Number",
             "MinValue": "1",
             "MaxValue": "5",
@@ -124,7 +124,7 @@
                 "ecs": "ami-db0306eb"
             },
             "eu-west-1": {
-                "ecs": "ami-2aaef35d"
+                "ecs": "ami-7948320e"
             },
             "ap-northeast-1": {
                 "ecs": "ami-fa12b7fa"
@@ -485,7 +485,6 @@
                                         "",
                                         [
                                             "[main]\n",
-                                            "interval=1\n",
                                             "stack=",
                                             {
                                                 "Ref": "AWS::StackId"
@@ -561,65 +560,76 @@
                                 "owner": "root",
                                 "group": "root"
                             }
-                        },
-                        "configure_es": {
-                            "files": {
-                                "/etc/elasticsearch/elasticsearch/yml": {
-                                    "content": {
-                                        "Fn::Join": [
-                                            "",
-                                            [
-                                                "cluster.name: ",
-                                                {
-                                                    "Ref": "ECSCluster"
-                                                },
-                                                "\n",
-                                                "index.number_of_shards: ",
-                                                {
-                                                    "Ref": "Shards"
-                                                },
-                                                "\n",
-                                                "index.number_of_replicas: ",
-                                                {
-                                                    "Ref": "Replicas"
-                                                },
-                                                "\n",
-                                                "cloud:\n",
-                                                "aws:\n",
-                                                "region: ",
-                                                {
-                                                    "Fn::FindInMap": [
-                                                        "AWSRegion2ESRegion",
-                                                        {
-                                                            "Ref": "AWS::Region"
-                                                        },
-                                                        "region"
+                        }
+					},
+                    "configure_es": {
+                        "files": {
+                            "/usr/share/elasticsearch/config/elasticsearch.yml": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "cluster.name: ",
+                                            {
+                                                "Ref": "ECSCluster"
+                                            },
+                                            "\n",
+                                            "index.number_of_shards: ",
+                                            {
+                                                "Ref": "Shards"
+                                            },
+                                            "\n",
+                                            "index.number_of_replicas: ",
+                                            {
+                                                "Ref": "Replicas"
+                                            },
+                                            "\n",
+                                            "cloud:\n",
+                                            "aws:\n",
+                                            "  access_key: ",
+                                            {
+                                                "Name": "AWS_ACCESS_KEY_ID",
+                                                "Value": {
+                                                    "Ref": "AccessKey"
+                                                }
+                                            },
+                                            "\n",
+                                            "  secret_key: ",
+                                            {
+                                                "Name": "AWS_SECRET_ACCESS_KEY",
+                                                "Value": {
+                                                    "Fn::GetAtt": [
+                                                        "AccessKey",
+                                                        "SecretAccessKey"
                                                     ]
-                                                },
-                                                "\n",
-                                                "discovery:\n",
-                                                "type: ec2\n"
-                                            ]
+                                                }
+                                            },
+                                            "\n"
+                                            "  region: ",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "AWSRegion2ESRegion",
+                                                    {
+                                                        "Ref": "AWS::Region"
+                                                    },
+                                                    "region"
+                                                ]
+                                            },
+                                            "\n",
+                                            "discovery:\n",
+                                            "  type: ec2\n"
                                         ]
-                                    },
-                                    "mode": "000644",
-                                    "owner": "root",
-                                    "group": "root"
-                                }
+                                    ]
+                                },
+                                "mode": "000644",
+                                "owner": "root",
+                                "group": "root"
                             }
                         }
                     }
                 }
             },
             "Properties": {
-                "BlockDeviceMappings": [
-                    {
-                        "DeviceName": "/dev/sda1",
-                        "Ebs": {
-                            "VolumeSize": "500"
-                        }
-                    }
-                ],
                 "ImageId": {
                     "Fn::FindInMap": [
                         "AWSRegion2AMI",
@@ -649,6 +659,11 @@
                             "",
                             [
                                 "#!/bin/bash -xe\n",
+                                "echo ECS_CLUSTER=",
+                                {
+                                  "Ref": "ECSCluster"
+                                },
+                                " >> /etc/ecs/ecs.config\n",
                                 "yum install -y aws-cfn-bootstrap\n",
                                 "/opt/aws/bin/cfn-init -v",
                                 " --stack ",
@@ -703,9 +718,9 @@
                 "Listeners": [
                     {
                         "InstancePort": "9200",
-                        "InstanceProtocol": "HTTP",
+                        "InstanceProtocol": "http",
                         "LoadBalancerPort": "9200",
-                        "Protocol": "HTTP"
+                        "Protocol": "http"
                     },
                     {
                         "InstancePort": "9300",
@@ -730,7 +745,7 @@
                 "ContainerDefinitions": [
                     {
                         "Name": "elasticsearch",
-                        "Image": "elasticsearch:1.7.1",
+                        "Image": "dcrbsltd/elasticsearch:1.7.1",
                         "Essential": "true",
                         "Cpu": "512",
                         "Memory": "1024",
@@ -779,18 +794,25 @@
                                 "SourceVolume": "data"
                             },
                             {
-                                "ContainerPath": "/etc/elasticsearch",
-                                "SourceVolume": "config"
+                                "ContainerPath": "/usr/share/elasticsearch/config",
+                                "SourceVolume": "config",
+                                "ReadOnly": "true"
                             }
                         ]
                     }
                 ],
                 "Volumes": [
                     {
-                        "Name": "data"
+                        "Name": "data",
+                        "Host": {
+                            "SourcePath": "/usr/share/elasticsearch/data"
+                        }
                     },
                     {
-                        "Name": "config"
+                        "Name": "config",
+                        "Host": {
+                            "SourcePath": "/usr/share/elasticsearch/config"
+                        }
                     }
                 ]
             }
@@ -802,7 +824,9 @@
                 "Cluster": {
                     "Ref": "ECSCluster"
                 },
-                "DesiredCount": "1",
+                "DesiredCount": {
+                    "Ref": "DesiredCapacity"
+                },
                 "LoadBalancers": [
                     {
                         "ContainerName": "elasticsearch",

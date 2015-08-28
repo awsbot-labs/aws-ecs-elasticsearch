@@ -1,8 +1,0 @@
-cluster.name: {{ getv "/elasticsearch/cluster/name" }}
-{{if exists "/elasticsearch/shards" }}index.number_of_shards: {{ getv "/elasticsearch/shards" }}{{end}}
-{{if exists "/elasticsearch/replicas" }}index.number_of_replicas: {{ getv "/elasticsearch/replicas" }}{{end}}
-cloud:
-  aws:
-    region: {{ getv "/aws/region" }}
-discovery:
-  type: ec2
