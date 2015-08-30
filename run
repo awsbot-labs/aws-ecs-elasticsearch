@@ -5,7 +5,8 @@ if [ $# -eq 0 ]; then
   exit 1
 else
   # Sets $IPADDRESS as your external IP (for AWS Security Groups)
-  IPADDRESS=`wget -qO- http://ipecho.net/plain ; echo -n`
+  #IPADDRESS=`wget -qO- http://ipecho.net/plain ; echo -n`
+  IPADDRESS=`curl -s http://whatismijnip.nl |cut -d " " -f 5`
   
   # We need a unique "stackname" for CloudFormation,
   # however CF doesn't accept periods in stack-names

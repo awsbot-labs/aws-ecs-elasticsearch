@@ -50,5 +50,13 @@ else
   echo " --> Connected on port 9200"
 fi
 
+echo " --> Seeding data"
+sleep 30
+curl -XPOST http://$(docker-machine ip default):9200/account/_bulk?pretty=true' --data-binary @data.json
 
+if [ $? -ne 0 ]; then
+	abort "Elasticsearch is not open on 9200"
+else
+  echo " --> Connected on port 9200"
+fi
 
