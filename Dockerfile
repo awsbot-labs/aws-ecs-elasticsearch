@@ -5,3 +5,6 @@ RUN /usr/share/elasticsearch/bin/plugin install elasticsearch/elasticsearch-clou
 
 # head for viewing shard and replica information
 RUN /usr/share/elasticsearch/bin/plugin --install mobz/elasticsearch-head
+
+# Copy of a test set of data
+#COPY data.json /tmp/data.json

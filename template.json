@@ -4,7 +4,7 @@
     "Parameters": {
         "DesiredCapacity": {
             "Description": "Desirered number of instances in the Elasticsearch auto-scaling group",
-            "Default": "2",
+            "Default": "3",
             "Type": "Number",
             "MinValue": "1",
             "MaxValue": "5",
@@ -191,7 +191,17 @@
                             "Statement": [
                                 {
                                     "Action": [
-                                        "ec2:DescribeInstances"
+                                      "autoscaling:Describe*",
+                                      "cloudformation:DescribeStacks",
+                                      "cloudformation:DescribeStackEvents",
+                                      "cloudformation:DescribeStackResource",
+                                      "cloudformation:DescribeStackResources",
+                                      "cloudformation:GetTemplate",
+                                      "cloudformation:List*",
+                                      "ec2:Describe*",
+                                      "elasticloadbalancing:Describe*",
+                                      "s3:Get*",
+                                      "s3:List*"
                                     ],
                                     "Effect": "Allow",
                                     "Resource": [
@@ -306,7 +316,6 @@
         },
         "IamInstanceProfile": {
             "Type": "AWS::IAM::InstanceProfile",
-            "DependsOn": "EC2InstanceRole",
             "Properties": {
                 "Path": "/",
                 "Roles": [
@@ -408,6 +417,16 @@
                 ]
             }
         },
+        "AutoScalingSecurityGroupIngress": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "GroupName": { "Ref": "AutoScalingSecurityGroup" },
+                "IpProtocol": "tcp",
+                "FromPort": "0",
+                "ToPort": "65335",
+                "SourceSecurityGroupName": { "Ref": "AutoScalingSecurityGroup" }
+            }
+        },
         "AutoScalingGroup": {
             "Type": "AWS::AutoScaling::AutoScalingGroup",
             "Properties": {
@@ -473,8 +492,8 @@
                     "configSets": {
                         "full_install": [
                             "install_cfn",
-                            "configure_ecs",
-                            "configure_es"
+                            "ecs_config",
+                            "es_config"
                         ]
                     },
                     "install_cfn": {
@@ -485,6 +504,7 @@
                                         "",
                                         [
                                             "[main]\n",
+                                            "interval=1\n",
                                             "stack=",
                                             {
                                                 "Ref": "AWS::StackId"
@@ -509,14 +529,13 @@
                                         [
                                             "[cfn-auto-reloader-hook]\n",
                                             "triggers=post.update\n",
-                                            "path=Resources.LaunchConfig.Metadata.AWS::CloudFormation::Init\n",
+                                            "path=Resources.AutoScalingLaunchConfig.Metadata.AWS::CloudFormation::Init\n",
                                             "action=/opt/aws/bin/cfn-init -v",
                                             " --stack ",
                                             {
                                                 "Ref": "AWS::StackName"
                                             },
-                                            " --resource LaunchConfig",
-                                            " --configsets configure_ecs",
+                                            " --resource AutoScalingLaunchConfig",
                                             " --region ",
                                             {
                                                 "Ref": "AWS::Region"
@@ -541,7 +560,7 @@
                             }
                         }
                     },
-                    "configure_ecs": {
+                    "ecs_config": {
                         "files": {
                             "/etc/ecs/ecs.config": {
                                 "content": {
@@ -561,63 +580,88 @@
                                 "group": "root"
                             }
                         }
-					},
-                    "configure_es": {
+                    },
+                    "es_config": {
                         "files": {
                             "/usr/share/elasticsearch/config/elasticsearch.yml": {
                                 "content": {
                                     "Fn::Join": [
                                         "",
+                                        [  
+                                          "cluster.name: ",
+                                          {
+                                              "Ref": "AWS::StackName"
+                                          },
+                                          "\n",
+                                          "index.number_of_shards: ",
+                                          {
+                                              "Ref": "Shards"
+                                          },
+                                          "\n",
+                                          "index.number_of_replicas: ",
+                                          {
+                                              "Ref": "Replicas"
+                                          },
+                                          "\n",
+                                          "cloud.aws.access_key: ",
+                                          {
+                                            "Ref": "AccessKey"
+                                          },
+                                          "\n",
+                                          "cloud.aws.secret_key: ",
+                                          {
+                                                  "Fn::GetAtt": [
+                                                      "AccessKey",
+                                                      "SecretAccessKey"
+                                                  ]
+                                          },
+                                          "\n",
+                                          "cloud.aws.region: ",
+                                          {
+                                              "Fn::FindInMap": [
+                                                  "AWSRegion2ESRegion",
+                                                  {
+                                                      "Ref": "AWS::Region"
+                                                  },
+                                                  "region"
+                                              ]
+                                          },
+                                          "\n",
+                                          "network.publish_host: _ec2:privateIp_\n",
+                                          "plugin.mandatory: cloud-aws\n",
+                                          "discovery.zen.ping.multicast.enabled: false\n",
+                                          "discovery.type: ec2\n",
+                                          "discovery.ec2.tag.aws:cloudformation:stack-name: ",
+                                          {
+                                              "Ref": "AWS::StackName"
+                                          },
+                                        "\n"
+                                        ]
+                                    ]
+                                },
+                                "mode": "000644",
+                                "owner": "root",
+                                "group": "root"
+                            },
+                            "/usr/share/elasticsearch/config/logging.yml": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
                                         [
-                                            "cluster.name: ",
-                                            {
-                                                "Ref": "ECSCluster"
-                                            },
-                                            "\n",
-                                            "index.number_of_shards: ",
-                                            {
-                                                "Ref": "Shards"
-                                            },
-                                            "\n",
-                                            "index.number_of_replicas: ",
-                                            {
-                                                "Ref": "Replicas"
-                                            },
-                                            "\n",
-                                            "cloud:\n",
-                                            "aws:\n",
-                                            "  access_key: ",
-                                            {
-                                                "Name": "AWS_ACCESS_KEY_ID",
-                                                "Value": {
-                                                    "Ref": "AccessKey"
-                                                }
-                                            },
-                                            "\n",
-                                            "  secret_key: ",
-                                            {
-                                                "Name": "AWS_SECRET_ACCESS_KEY",
-                                                "Value": {
-                                                    "Fn::GetAtt": [
-                                                        "AccessKey",
-                                                        "SecretAccessKey"
-                                                    ]
-                                                }
-                                            },
-                                            "\n"
-                                            "  region: ",
-                                            {
-                                                "Fn::FindInMap": [
-                                                    "AWSRegion2ESRegion",
-                                                    {
-                                                        "Ref": "AWS::Region"
-                                                    },
-                                                    "region"
-                                                ]
-                                            },
-                                            "\n",
-                                            "discovery:\n",
-                                            "  type: ec2\n"
+                                          "es.logger.level: INFO\n",
+                                          "rootLogger: ${es.logger.level}, console\n",
+                                          "logger:\n",
+                                          "  # log action execution errors for easier debugging\n",
+                                          "  action: DEBUG\n",
+                                          "  # reduce the logging for aws, too much is logged under the default INFO\n",
+                                          "  com.amazonaws: DEBUG\n",
+                                          "appender:\n",
+                                          "  console:\n",
+                                          "    type: console\n",
+                                          "    layout:\n",
+                                          "      type: consolePattern\n",
+                                          "      conversionPattern: \"[%d{ISO8601}][%-5p][%-25c] %m%n\"\n",
+                                          "\n"
                                         ]
                                     ]
                                 },
@@ -661,7 +705,7 @@
                                 "#!/bin/bash -xe\n",
                                 "echo ECS_CLUSTER=",
                                 {
-                                  "Ref": "ECSCluster"
+                                    "Ref": "ECSCluster"
                                 },
                                 " >> /etc/ecs/ecs.config\n",
                                 "yum install -y aws-cfn-bootstrap\n",
