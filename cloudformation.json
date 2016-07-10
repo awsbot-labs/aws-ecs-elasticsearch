@@ -64,8 +64,7 @@
         },
         "NotificationEmail": {
             "Description": "Email to send notifications to",
-            "Type": "String",
-            "Default": "dcrbsltd@gmail.com"
+            "Type": "String"
         },
         "Shards": {
             "Description": "The number of Elasticsearch shards",
@@ -88,7 +87,6 @@
         },
         "VpcId": {
             "Description": "Virtual Private Cloud ID, e.g. vpc-3d1c175f",
-            "Default": "vpc-3ab76351",
             "Type": "String"
         }
     },

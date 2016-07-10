@@ -49,6 +49,12 @@ function source_envs()
   if [ -e "environment.variables" ]; then
     echo " --> Sourcing environment variables"
     source environment.variables
+  else 
+    PARAMETERS=ParameterKey=SSHLocation,ParameterValue="$IPADDRESS/32"
+    PARAMETERS="${PARAMETERS} ParameterKey=KeyName,ParameterValue=$KEY_NAME"
+    PARAMETERS="${PARAMETERS} ParameterKey=DNSDomain,ParameterValue=$DNS_DOMAIN"
+    PARAMETERS="${PARAMETERS} ParameterKey=NotificationEmail,ParameterValue=$EMAIL"
+    PARAMETERS="${PARAMETERS} ParameterKey=VpcId,ParameterValue=$VPC_ID"
   fi
   
   # A stack name is required, which is created from 
