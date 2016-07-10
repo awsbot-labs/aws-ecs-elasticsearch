@@ -1,0 +1,22 @@
+#!/bin/bash
+# The uncommented variables 
+# are the bare minimum required to deploy this CF template
+
+# AWS Keys and Region
+export AWS_ACCESS_KEY_ID=
+export AWS_SECRET_ACCESS_KEY=
+export AWS_DEFAULT_REGION=
+
+# DNS Domain name which is also used as the Stack name
+export HOST=elasticsearch
+export DNS_DOMAIN=
+
+# A stack name is required, which is created from 
+# the host and domain with dashes subsituted for periods
+export STACK_NAME=$HOST-`echo $DNS_DOMAIN | sed -e 's/\./\-/g'`
+
+
+PARAMETERS <<EOF ParameterKey=SSHLocation,ParameterValue="$IPADDRESS/32" \
+ParameterKey=KeyName,ParameterValue=$KEY_NAME \
+ParameterKey=DNSDomain,ParameterValue=$DOMAIN_NAME
+EOF
