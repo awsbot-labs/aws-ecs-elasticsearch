@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ $# -eq 0 ]; then
-  echo "Usage: $0 create|update <SSH_KEYNAME> <DNSDOMAIN> <VPCID>"
-  echo "e.g. $0 create MyAWSKey example.com vpc-3ab76351"
+  echo "Usage: $0 create|update <SSH_KEYNAME> <DOMAIN_NAME>"
+  echo "e.g. $0 create id_rsa example.com"
   exit 1
 else
   # Sets $IPADDRESS as your external IP (for AWS Security Groups)
@@ -16,7 +16,7 @@ else
   # http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html
   export AWS_DEFAULT_PROFILE=elasticsearch-$STACK_NAME
   aws configure --profile $AWS_DEFAULT_PROFILE
-  
+  aws ec2 create-key-pair --key-name $3
   # Run the CF command with our parameters and the template.json
   aws cloudformation $1-stack \
     --stack-name $AWS_DEFAULT_PROFILE \
@@ -24,6 +24,5 @@ else
     --capabilities CAPABILITY_IAM \
     --parameters ParameterKey=SSHLocation,ParameterValue="$IPADDRESS/32" \
 ParameterKey=KeyName,ParameterValue=$2 \
-ParameterKey=DNSDomain,ParameterValue=$3 \
-ParameterKey=VpcId,ParameterValue=$4
+ParameterKey=DNSDomain,ParameterValue=$3
 fi
