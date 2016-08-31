@@ -1,5 +1,5 @@
 elasticsearch:
-  image: dcrbsltd/elasticsearch:1.7.1
+  image: dcrbsltd/elasticsearch:2.3
   ports:
     - "9200:9200"
     - "9300:9300"

@@ -1,10 +1,10 @@
-FROM elasticsearch:1.7.1
+FROM elasticsearch:2.3
 
 # Install plugins cloud-aws for ec2 discovery
-RUN /usr/share/elasticsearch/bin/plugin install elasticsearch/elasticsearch-cloud-aws/2.7.0
+RUN bin/plugin install cloud-aws
 
 # head for viewing shard and replica information
-RUN /usr/share/elasticsearch/bin/plugin --install mobz/elasticsearch-head
+RUN bin/plugin install mobz/elasticsearch-head
 
 # Copy of a test set of data
 #COPY data.json /tmp/data.json
