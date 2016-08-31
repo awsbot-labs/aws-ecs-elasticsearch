@@ -3,7 +3,7 @@ VERSION = $(shell cat VERSION)
 KEY_NAME = elasticsearch
 DOMAIN_NAME = awsbot.com
 DATE = $(shell date)
-.PHONY: all build clean test tag_latest release run install
+.PHONY: all docker build clean test tag_latest release run install
 
 all: build
 
