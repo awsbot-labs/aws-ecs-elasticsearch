@@ -7,6 +7,10 @@
           "Default": "ami-ccd942bf",
           "Type": "String"
         },
+        "AppName": {
+          "Type": "String",
+          "Default": "elasticsearch23"
+        },
         "DesiredCapacity": {
             "Description": "Desirered number of instances in the Elasticsearch auto-scaling group",
             "Default": "3",
@@ -18,6 +22,10 @@
         "DNSDomain": {
             "Description": "DNS Name for the Application",
             "Type": "String"
+        },
+        "DockerImage": {
+          "Type": "String",
+          "Default": "dcrbsltd/elasticsearch:2.3"
         },
         "KeyName": {
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
@@ -271,7 +279,7 @@
                 "Path": "/",
                 "Policies": [
                     {
-                        "PolicyName": "ecs-service",
+                        "PolicyName": "ecs-instance",
                         "PolicyDocument": {
                             "Statement": [
                                 {
@@ -294,7 +302,19 @@
                                     "Resource": [
                                         "*"
                                     ]
-                                }
+                                },
+                                {
+                                  "Effect": "Allow",
+                                  "Action": [
+                                    "logs:CreateLogGroup",
+                                    "logs:CreateLogStream",
+                                    "logs:PutLogEvents",
+                                    "logs:DescribeLogStreams"
+                                ],
+                                  "Resource": [
+                                    "arn:aws:logs:*:*:*"
+                                ]
+                              }
                             ]
                         }
                     }
@@ -453,7 +473,8 @@
                         "full_install": [
                             "install_cfn",
                             "ecs_config",
-                            "es_config"
+                            "es_config",
+                            "awslogs_config"
                         ]
                     },
                     "install_cfn": {
@@ -630,7 +651,62 @@
                                 "group": "root"
                             }
                         }
-                    }
+                    },
+                    "awslogs_config": {
+                      "packages":{},
+                      "files": {
+                          "/etc/awslogs/awscli.conf": {
+                              "content": {
+                                  "Fn::Join": [
+                                      "", [
+                                          "[plugins]\n",
+                                          "cwlogs = cwlogs\n",
+                                          "[default]\n",
+                                          "region = ", {
+                                              "Ref": "AWS::Region"
+                                          },
+                                          "\n"
+                                      ]
+                                  ]
+                              },
+                              "mode": "000644",
+                              "owner": "root",
+                              "group": "root"
+                          },
+                          "/etc/awslogs/awslogs.conf": {
+                              "content": {
+                                  "Fn::Join": [
+                                      "", [
+                                          "[general]\n",
+                                          "state_file = /var/lib/awslogs/agent-state\n",
+                                          "[/var/log/messages]\n",
+                                          "datetime_format = %b %d %H:%M:%S\n",
+                                          "file = /var/log/messages\n",
+                                          "buffer_duration = 5000\n",
+                                          "log_stream_name = {instance_id}\n",
+                                          "initial_position = start_of_file\n",
+                                          "log_group_name = /var/log/messages\n"
+                                      ]
+                                  ]
+                              },
+                              "mode": "000644",
+                              "owner": "root",
+                              "group": "root"
+                          }
+                      },
+                      "services": {
+                          "sysvinit": {
+                              "awslogs": {
+                                  "enabled": "true",
+                                  "ensureRunning": "true",
+                                  "files": [
+                                      "/etc/awslogs/awscli.conf",
+                                      "/etc/awslogs/awslogs.conf"
+                                  ]
+                              }
+                          }
+                      }
+                   }
                 }
             },
             "Properties": {
@@ -662,7 +738,7 @@
                                     "Ref": "ECSCluster"
                                 },
                                 " >> /etc/ecs/ecs.config\n",
-                                "yum install -y aws-cfn-bootstrap\n",
+                                "yum install -y aws-cfn-bootstrap awslogs\n",
                                 "/opt/aws/bin/cfn-init -v",
                                 " --stack ",
                                 {
@@ -708,7 +784,7 @@
                 "HealthCheck": {
                     "HealthyThreshold": "2",
                     "Interval": "6",
-                    "Target": "HTTP:9200/",
+                    "Target": "TCP:9200",
                     "Timeout": "3",
                     "UnhealthyThreshold": "3"
                 },
@@ -716,9 +792,9 @@
                 "Listeners": [
                     {
                         "InstancePort": "9200",
-                        "InstanceProtocol": "http",
+                        "InstanceProtocol": "tcp",
                         "LoadBalancerPort": "9200",
-                        "Protocol": "http"
+                        "Protocol": "tcp"
                     },
                     {
                         "InstancePort": "9300",
@@ -770,8 +846,8 @@
             "Properties": {
                 "ContainerDefinitions": [
                     {
-                        "Name": "elasticsearch",
-                        "Image": "dcrbsltd/elasticsearch:1.7.1",
+                        "Name": "master",
+                        "Image": { "Ref": "DockerImage" },
                         "Essential": "true",
                         "Cpu": "512",
                         "Memory": "1024",
@@ -779,7 +855,75 @@
                             {
                                 "ContainerPort": "9200",
                                 "HostPort": "9200"
+                            }
+                        ],
+                        "Environment": [
+                            {
+                                "Name": "AWS_REGION",
+                                "Value": {
+                                    "Fn::FindInMap": [
+                                        "AWSRegion2ESRegion",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        "region"
+                                    ]
+                                }
                             },
+                            {
+                                "Name": "AWS_ACCESS_KEY_ID",
+                                "Value": {
+                                    "Ref": "AccessKey"
+                                }
+                            },
+                            {
+                                "Name": "AWS_SECRET_ACCESS_KEY",
+                                "Value": {
+                                    "Fn::GetAtt": [
+                                        "AccessKey",
+                                        "SecretAccessKey"
+                                    ]
+                                }
+                            }
+                        ],
+                        "MountPoints": [
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/data",
+                                "SourceVolume": "data"
+                            },
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/config/elasticsearch.yml",
+                                "SourceVolume": "master-config",
+                                "ReadOnly": "true"
+                            },
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/config/logging.yml",
+                                "SourceVolume": "logging",
+                                "ReadOnly": "true"
+                            },
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/config/scripts",
+                                "SourceVolume": "scripts",
+                                "ReadOnly": "true"
+                            }
+                        ],
+                        "LogConfiguration": {
+                            "LogDriver": "awslogs",
+                            "Options": {
+                                "awslogs-group": "awslogs-elasticsearch",
+                                "awslogs-region": {
+                                    "Ref": "AWS::Region"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "Name": "data",
+                        "Image": { "Ref": "DockerImage" },
+                        "Essential": "true",
+                        "Cpu": "512",
+                        "Memory": "1024",
+                        "PortMappings": [
                             {
                                 "ContainerPort": "9300",
                                 "HostPort": "9300"
@@ -820,30 +964,67 @@
                                 "SourceVolume": "data"
                             },
                             {
-                                "ContainerPath": "/usr/share/elasticsearch/config",
-                                "SourceVolume": "config",
+                                "ContainerPath": "/usr/share/elasticsearch/config/elasticsearch.yml",
+                                "SourceVolume": "data-config",
+                                "ReadOnly": "true"
+                            },
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/config/logging.yml",
+                                "SourceVolume": "logging",
+                                "ReadOnly": "true"
+                            },
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/config/scripts",
+                                "SourceVolume": "scripts",
                                 "ReadOnly": "true"
                             }
-                        ]
+                        ],
+                        "LogConfiguration": {
+                            "LogDriver": "awslogs",
+                            "Options": {
+                                "awslogs-group": "awslogs-elasticsearch",
+                                "awslogs-region": {
+                                    "Ref": "AWS::Region"
+                                }
+                            }
+                        }
                     }
                 ],
                 "Volumes": [
                     {
                         "Name": "data",
                         "Host": {
-                            "SourcePath": "/usr/share/elasticsearch/data"
+                            "SourcePath": "/mnt"
                         }
                     },
                     {
-                        "Name": "config",
+                        "Name": "master-config",
                         "Host": {
-                            "SourcePath": "/usr/share/elasticsearch/config"
+                            "SourcePath": "/usr/share/elasticsearch/config/master.yml"
+                        }
+                    },
+                    {
+                        "Name": "data-config",
+                        "Host": {
+                            "SourcePath": "/usr/share/elasticsearch/config/data.yml"
+                        }
+                    },
+                    {
+                        "Name": "logging",
+                        "Host": {
+                            "SourcePath": "/usr/share/elasticsearch/config/logging.yml"
+                        }
+                    },
+                    {
+                        "Name": "scripts",
+                        "Host": {
+                            "SourcePath": "/usr/share/elasticsearch/config/scripts"
                         }
                     }
                 ]
             }
         },
-        "ECSServiceDefinition": {
+        "MasterECSServiceDefinition": {
             "DependsOn": "AutoScalingGroup",
             "Type": "AWS::ECS::Service",
             "Properties": {
@@ -855,8 +1036,35 @@
                 },
                 "LoadBalancers": [
                     {
-                        "ContainerName": "elasticsearch",
+                        "ContainerName": "master",
                         "ContainerPort": "9200",
+                        "LoadBalancerName": {
+                            "Ref": "ElasticLoadBalancer"
+                        }
+                    }
+                ],
+                "Role": {
+                    "Ref": "ECSServiceRole"
+                },
+                "TaskDefinition": {
+                    "Ref": "ECSTaskDefinition"
+                }
+            }
+        },
+        "DataECSServiceDefinition": {
+            "DependsOn": "AutoScalingGroup",
+            "Type": "AWS::ECS::Service",
+            "Properties": {
+                "Cluster": {
+                    "Ref": "ECSCluster"
+                },
+                "DesiredCount": {
+                    "Ref": "DesiredCapacity"
+                },
+                "LoadBalancers": [
+                    {
+                        "ContainerName": "data",
+                        "ContainerPort": "9300",
                         "LoadBalancerName": {
                             "Ref": "ElasticLoadBalancer"
                         }
@@ -891,7 +1099,10 @@
                             "Fn::Join": [
                                 "",
                                 [
-                                    "elasticsearch.",
+                                    {
+                                      "Ref": "AppName"
+                                    },
+                                    ".",
                                     {
                                         "Ref": "DNSDomain"
                                     },
@@ -921,6 +1132,24 @@
         }
     },
     "Outputs": {
+      "WebInterface": {
+          "Description": "The DNSName of the load balancer",
+          "Value": {
+              "Fn::Join": [
+                  "", [
+                    "http://",
+                    {
+                      "Ref": "AppName"
+                    },
+                    ".",
+                    {
+                      "Ref": "DNSDomain"
+                    },
+                    ":9200/_plugin/head/"
+                  ]
+              ]
+          }
+      },
         "LoadbalancerEndpoint": {
             "Description": "The DNSName of the load balancer",
             "Value": {

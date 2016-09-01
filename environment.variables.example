@@ -8,7 +8,7 @@ export AWS_SECRET_ACCESS_KEY=
 export AWS_DEFAULT_REGION=eu-west-1
 
 # DNS Domain name which is also used as the Stack name
-export HOST=elasticsearch
+export HOST=elasticsearch23
 export DNS_DOMAIN=
 
 export KEY_NAME=elasticsearch
