@@ -1,4 +1,4 @@
-FROM elasticsearch:2.3
+FROM elasticsearch:2.4
 
 # Install plugins cloud-aws for ec2 discovery
 RUN bin/plugin install cloud-aws

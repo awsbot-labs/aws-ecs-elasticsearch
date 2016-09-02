@@ -175,48 +175,6 @@
                 ]
             }
         },
-        "ElasticsearchUser": {
-            "Type": "AWS::IAM::User",
-            "Properties": {
-                "Path": "/",
-                "Policies": [
-                    {
-                        "PolicyName": "elasticsearch-user",
-                        "PolicyDocument": {
-                            "Statement": [
-                                {
-                                    "Action": [
-                                      "autoscaling:Describe*",
-                                      "cloudformation:DescribeStacks",
-                                      "cloudformation:DescribeStackEvents",
-                                      "cloudformation:DescribeStackResource",
-                                      "cloudformation:DescribeStackResources",
-                                      "cloudformation:GetTemplate",
-                                      "cloudformation:List*",
-                                      "ec2:Describe*",
-                                      "elasticloadbalancing:Describe*",
-                                      "s3:Get*",
-                                      "s3:List*"
-                                    ],
-                                    "Effect": "Allow",
-                                    "Resource": [
-                                        "*"
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                ]
-            }
-        },
-        "AccessKey": {
-            "Type": "AWS::IAM::AccessKey",
-            "Properties": {
-                "UserName": {
-                    "Ref": "ElasticsearchUser"
-                }
-            }
-        },
         "ECSServiceRole": {
             "Type": "AWS::IAM::Role",
             "Properties": {
@@ -334,13 +292,6 @@
         },
         "AutoScalingSecurityGroup": {
             "Type": "AWS::EC2::SecurityGroup",
-            "UpdatePolicy": {
-                "AutoScalingRollingUpdate": {
-                    "MaxBatchSize": "3",
-                    "MinInstancesInService": "1",
-                    "PauseTime": "PT2M30S"
-                }
-            },
             "Properties": {
                 "GroupDescription": "Enable SSH access",
                 "SecurityGroupIngress": [
@@ -408,6 +359,13 @@
             }
         },
         "AutoScalingGroup": {
+            "UpdatePolicy": {
+                "AutoScalingRollingUpdate": {
+                    "MaxBatchSize": "3",
+                    "MinInstancesInService": "1",
+                    "PauseTime": "PT2M30S"
+                }
+            },
             "Type": "AWS::AutoScaling::AutoScalingGroup",
             "Properties": {
                 "AvailabilityZones": {
@@ -552,6 +510,8 @@
                                             {
                                                 "Ref": "ECSCluster"
                                             },
+                                            "\n",
+                                            "ECS_LOGLEVEL=debug\n",
                                             "\n"
                                         ]
                                     ]
@@ -584,19 +544,6 @@
                                               "Ref": "Replicas"
                                           },
                                           "\n",
-                                          "cloud.aws.access_key: ",
-                                          {
-                                            "Ref": "AccessKey"
-                                          },
-                                          "\n",
-                                          "cloud.aws.secret_key: ",
-                                          {
-                                                  "Fn::GetAtt": [
-                                                      "AccessKey",
-                                                      "SecretAccessKey"
-                                                  ]
-                                          },
-                                          "\n",
                                           "cloud.aws.region: ",
                                           {
                                               "Fn::FindInMap": [
@@ -611,6 +558,8 @@
                                           "network.publish_host: _ec2:privateIp_\n",
                                           "plugin.mandatory: cloud-aws\n",
                                           "discovery.zen.ping.multicast.enabled: false\n",
+                                          "discovery.zen.ping_timeout: 30s\n",
+                                          "discovery.zen.minimum_master_nodes: 2\n",
                                           "discovery.type: ec2\n",
                                           "discovery.ec2.tag.aws:cloudformation:stack-name: ",
                                           {
@@ -783,7 +732,7 @@
                 },
                 "HealthCheck": {
                     "HealthyThreshold": "2",
-                    "Interval": "6",
+                    "Interval": "10",
                     "Target": "TCP:9200",
                     "Timeout": "3",
                     "UnhealthyThreshold": "3"
@@ -846,7 +795,7 @@
             "Properties": {
                 "ContainerDefinitions": [
                     {
-                        "Name": "master",
+                        "Name": "elasticsearch",
                         "Image": { "Ref": "DockerImage" },
                         "Essential": "true",
                         "Cpu": "512",
@@ -855,130 +804,12 @@
                             {
                                 "ContainerPort": "9200",
                                 "HostPort": "9200"
-                            }
-                        ],
-                        "Environment": [
-                            {
-                                "Name": "AWS_REGION",
-                                "Value": {
-                                    "Fn::FindInMap": [
-                                        "AWSRegion2ESRegion",
-                                        {
-                                            "Ref": "AWS::Region"
-                                        },
-                                        "region"
-                                    ]
-                                }
                             },
-                            {
-                                "Name": "AWS_ACCESS_KEY_ID",
-                                "Value": {
-                                    "Ref": "AccessKey"
-                                }
-                            },
-                            {
-                                "Name": "AWS_SECRET_ACCESS_KEY",
-                                "Value": {
-                                    "Fn::GetAtt": [
-                                        "AccessKey",
-                                        "SecretAccessKey"
-                                    ]
-                                }
-                            }
-                        ],
-                        "MountPoints": [
-                            {
-                                "ContainerPath": "/usr/share/elasticsearch/data",
-                                "SourceVolume": "data"
-                            },
-                            {
-                                "ContainerPath": "/usr/share/elasticsearch/config/elasticsearch.yml",
-                                "SourceVolume": "master-config",
-                                "ReadOnly": "true"
-                            },
-                            {
-                                "ContainerPath": "/usr/share/elasticsearch/config/logging.yml",
-                                "SourceVolume": "logging",
-                                "ReadOnly": "true"
-                            },
-                            {
-                                "ContainerPath": "/usr/share/elasticsearch/config/scripts",
-                                "SourceVolume": "scripts",
-                                "ReadOnly": "true"
-                            }
-                        ],
-                        "LogConfiguration": {
-                            "LogDriver": "awslogs",
-                            "Options": {
-                                "awslogs-group": "awslogs-elasticsearch",
-                                "awslogs-region": {
-                                    "Ref": "AWS::Region"
-                                }
-                            }
-                        }
-                    },
-                    {
-                        "Name": "data",
-                        "Image": { "Ref": "DockerImage" },
-                        "Essential": "true",
-                        "Cpu": "512",
-                        "Memory": "1024",
-                        "PortMappings": [
                             {
                                 "ContainerPort": "9300",
                                 "HostPort": "9300"
                             }
                         ],
-                        "Environment": [
-                            {
-                                "Name": "AWS_REGION",
-                                "Value": {
-                                    "Fn::FindInMap": [
-                                        "AWSRegion2ESRegion",
-                                        {
-                                            "Ref": "AWS::Region"
-                                        },
-                                        "region"
-                                    ]
-                                }
-                            },
-                            {
-                                "Name": "AWS_ACCESS_KEY_ID",
-                                "Value": {
-                                    "Ref": "AccessKey"
-                                }
-                            },
-                            {
-                                "Name": "AWS_SECRET_ACCESS_KEY",
-                                "Value": {
-                                    "Fn::GetAtt": [
-                                        "AccessKey",
-                                        "SecretAccessKey"
-                                    ]
-                                }
-                            }
-                        ],
-                        "MountPoints": [
-                            {
-                                "ContainerPath": "/usr/share/elasticsearch/data",
-                                "SourceVolume": "data"
-                            },
-                            {
-                                "ContainerPath": "/usr/share/elasticsearch/config/elasticsearch.yml",
-                                "SourceVolume": "data-config",
-                                "ReadOnly": "true"
-                            },
-                            {
-                                "ContainerPath": "/usr/share/elasticsearch/config/logging.yml",
-                                "SourceVolume": "logging",
-                                "ReadOnly": "true"
-                            },
-                            {
-                                "ContainerPath": "/usr/share/elasticsearch/config/scripts",
-                                "SourceVolume": "scripts",
-                                "ReadOnly": "true"
-                            }
-                        ],
                         "LogConfiguration": {
                             "LogDriver": "awslogs",
                             "Options": {
@@ -987,7 +818,23 @@
                                     "Ref": "AWS::Region"
                                 }
                             }
-                        }
+                        },
+                        "MountPoints": [
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/data",
+                                "SourceVolume": "data"
+                            },
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/config/logging.yml",
+                                "SourceVolume": "logging",
+                                "ReadOnly": "true"
+                            },
+                            {
+                                "ContainerPath": "/usr/share/elasticsearch/config/elasticsearch.yml",
+                                "SourceVolume": "config",
+                                "ReadOnly": "true"
+                            }
+                        ]
                     }
                 ],
                 "Volumes": [
@@ -998,33 +845,21 @@
                         }
                     },
                     {
-                        "Name": "master-config",
-                        "Host": {
-                            "SourcePath": "/usr/share/elasticsearch/config/master.yml"
-                        }
-                    },
-                    {
-                        "Name": "data-config",
-                        "Host": {
-                            "SourcePath": "/usr/share/elasticsearch/config/data.yml"
-                        }
-                    },
-                    {
                         "Name": "logging",
                         "Host": {
                             "SourcePath": "/usr/share/elasticsearch/config/logging.yml"
                         }
                     },
                     {
-                        "Name": "scripts",
+                        "Name": "config",
                         "Host": {
-                            "SourcePath": "/usr/share/elasticsearch/config/scripts"
+                            "SourcePath": "/usr/share/elasticsearch/config/elasticsearch.yml"
                         }
                     }
                 ]
             }
         },
-        "MasterECSServiceDefinition": {
+        "ECSServiceDefinition": {
             "DependsOn": "AutoScalingGroup",
             "Type": "AWS::ECS::Service",
             "Properties": {
@@ -1036,35 +871,8 @@
                 },
                 "LoadBalancers": [
                     {
-                        "ContainerName": "master",
+                        "ContainerName": "elasticsearch",
                         "ContainerPort": "9200",
-                        "LoadBalancerName": {
-                            "Ref": "ElasticLoadBalancer"
-                        }
-                    }
-                ],
-                "Role": {
-                    "Ref": "ECSServiceRole"
-                },
-                "TaskDefinition": {
-                    "Ref": "ECSTaskDefinition"
-                }
-            }
-        },
-        "DataECSServiceDefinition": {
-            "DependsOn": "AutoScalingGroup",
-            "Type": "AWS::ECS::Service",
-            "Properties": {
-                "Cluster": {
-                    "Ref": "ECSCluster"
-                },
-                "DesiredCount": {
-                    "Ref": "DesiredCapacity"
-                },
-                "LoadBalancers": [
-                    {
-                        "ContainerName": "data",
-                        "ContainerPort": "9300",
                         "LoadBalancerName": {
                             "Ref": "ElasticLoadBalancer"
                         }
