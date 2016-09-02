@@ -8,10 +8,12 @@ export AWS_SECRET_ACCESS_KEY=
 export AWS_DEFAULT_REGION=eu-west-1
 
 # DNS Domain name which is also used as the Stack name
-export HOST=elasticsearch24
-export DNS_DOMAIN=
+export HOST=elasticsearch23
+export DNS_DOMAIN=awsbot.com
 
-export KEY_NAME=elasticsearch
+export KEY_NAME=elasticsearch23
+
+export TIME_STAMP=$(date +'%s')
 
 # The port on the endpoint to test
 export PORT=9200
@@ -19,7 +21,6 @@ export PORT=9200
 # The VPC ID of the VPC
 export VPC_ID=
 
-# An email address for CloudFormation notifications
 export EMAIL=
 
 # The parameter values passed to the aws clouformation create command 

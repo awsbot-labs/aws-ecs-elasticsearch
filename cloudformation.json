@@ -474,6 +474,7 @@
                                             {
                                                 "Ref": "AWS::StackName"
                                             },
+                                            " --configsets full_install",
                                             " --resource AutoScalingLaunchConfig",
                                             " --region ",
                                             {
@@ -556,9 +557,9 @@
                                           },
                                           "\n",
                                           "network.publish_host: _ec2:privateIp_\n",
+                                          "network.host: 0.0.0.0\n",
                                           "plugin.mandatory: cloud-aws\n",
                                           "discovery.zen.ping.multicast.enabled: false\n",
-                                          "discovery.zen.ping_timeout: 30s\n",
                                           "discovery.zen.minimum_master_nodes: 2\n",
                                           "discovery.type: ec2\n",
                                           "discovery.ec2.tag.aws:cloudformation:stack-name: ",
