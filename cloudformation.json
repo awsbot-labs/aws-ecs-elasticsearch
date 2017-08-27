@@ -4,7 +4,7 @@
     "Parameters": {
         "AmiId": {
           "Description": "The Amazon Machine Image Id for the EC2 Instance.",
-          "Default": "ami-ccd942bf",
+          "Default": "ami-5f140c39",
           "Type": "String"
         },
         "AppName": {
@@ -37,6 +37,7 @@
         },        
         "DNSDomain": {
             "Description": "DNS Name for the Application",
+            "Default": "awsbot.com",
             "Type": "String"
         },
         "DockerImage": {
@@ -45,7 +46,7 @@
         },
         "KeyName": {
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
-            "Default": "elasticsearch",
+            "Default": "default",
             "Type": "String",
             "MinLength": "1",
             "MaxLength": "64",
@@ -81,15 +82,6 @@
             ],
             "ConstraintDescription": "must be a valid EC2 instance type."
         },
-        "ContainerPort": {
-            "Description": "The application port",
-            "Default": "9200",
-            "Type": "String"
-        },
-        "NotificationEmail": {
-            "Description": "Email to send notifications to",
-            "Type": "String"
-        },
         "Shards": {
             "Description": "The number of Elasticsearch shards",
             "Default": "5",
@@ -101,7 +93,8 @@
             "Type": "String"
         },
         "SnapshotBucket": {
-            "Description": "The name of An S3 bucket to save snapshots to.",
+            "Description": "The ARN of An S3 bucket for snapshots",
+            "Default": "arn:aws:s3:::elasticsearch-snapshots-ylsrkh51ua3x2",
             "Type": "String"
         },
         "SSHLocation": {
@@ -115,36 +108,8 @@
         },
         "VpcId": {
             "Description": "Virtual Private Cloud ID, e.g. vpc-3d1c175f",
+            "Default": "vpc-6c2a5b08",
             "Type": "String"
-        }
-    },
-    "Conditions": {
-        "Is-EC2-VPC": {
-            "Fn::Or": [
-                {
-                    "Fn::Equals": [
-                        {
-                            "Ref": "AWS::Region"
-                        },
-                        "eu-central-1"
-                    ]
-                },
-                {
-                    "Fn::Equals": [
-                        {
-                            "Ref": "AWS::Region"
-                        },
-                        "cn-north-1"
-                    ]
-                }
-            ]
-        },
-        "Is-EC2-Classic": {
-            "Fn::Not": [
-                {
-                    "Condition": "Is-EC2-VPC"
-                }
-            ]
         }
     },
     "Mappings": {
@@ -182,19 +147,6 @@
         }
     },
     "Resources": {
-        "NotificationTopic": {
-            "Type": "AWS::SNS::Topic",
-            "Properties": {
-                "Subscription": [
-                    {
-                        "Endpoint": {
-                            "Ref": "NotificationEmail"
-                        },
-                        "Protocol": "email"
-                    }
-                ]
-            }
-        },
         "ECSServiceRole": {
             "Type": "AWS::IAM::Role",
             "Properties": {
@@ -301,36 +253,9 @@
                                     "s3:ListBucketVersions"
                                   ],
                                   "Effect": "Allow",
-                                  "Condition": {
-                                    "StringLike": {
-                                      "s3:prefix": [
-                                        {
-                                          "Fn::Join": [
-                                              "",
-                                              [  
-                                                {
-                                                  "Ref": "AWS::Stackname"
-                                                },
-                                                "/*"
-                                              ]
-                                          ]
-                                        }
-                                      ]
-                                    }
-                                  },
-                                  "Resource": [
-                                    {
-                                      "Fn::Join": [
-                                          "",
-                                          [  
-                                            "arn:aws:s3:::",
-                                            {
+                                  "Resource": {
                                               "Ref": "SnapshotBucket"
                                             }
-                                          ]
-                                      ]
-                                    }
-                                  ]
                                 },
                                 {
                                   "Action": [
@@ -346,13 +271,8 @@
                                       "Fn::Join": [
                                           "",
                                           [  
-                                            "arn:aws:s3:::",
                                             {
                                               "Ref": "SnapshotBucket"
-                                            },
-                                            "/",
-                                            {
-                                              "Ref": "AWS::Stackname"
                                             },
                                             "/*"
                                           ]
@@ -466,17 +386,6 @@
                         "Ref": "ElasticLoadBalancer"
                     }
                 ],
-                "NotificationConfiguration": {
-                    "TopicARN": {
-                        "Ref": "NotificationTopic"
-                    },
-                    "NotificationTypes": [
-                        "autoscaling:EC2_INSTANCE_LAUNCH",
-                        "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
-                        "autoscaling:EC2_INSTANCE_TERMINATE",
-                        "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
-                    ]
-                },
                 "MinSize": "1",
                 "MaxSize": "10",
                 "DesiredCapacity": {
@@ -1059,4 +968,5 @@
             }
         }
     }
+
 }

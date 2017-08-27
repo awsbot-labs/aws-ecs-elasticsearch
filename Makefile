@@ -18,14 +18,10 @@ tag_latest:
 push:
 	docker push $(NAME):$(VERSION)
 
-install:
-	@bash ./install
-
-clean:
-	@bash ./clean
-
-test:
-	@bash ./test
+cloudformation:
+	aws cloudformation create-stack \
+		elasticsearch-$(DOMAIN_NAME) \
+		
 
 release:
 	@echo "Enter commit message:"

@@ -1,7 +1,0 @@
-#!/bin/bash
-
-# Source common functions between scripts and environment variables
-source functions
-
-# Cleanup the stack i.e. delete it
-cleanup
